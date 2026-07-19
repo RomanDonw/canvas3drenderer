@@ -91,11 +91,13 @@ function on_render()
 
     local mvpmat = mat4.mul(projmat, mat4.mul(viewmat, modlmat))
 
-    document.canvas.data:clear(0)
+    document.canvas.data:clear(255, 255, 255, 255)
+    local dbuff = document.canvas.data:get_data()
 
+    document.canvas.data:clear(0)
     local cdata = document.canvas.data:get_data()
 
-    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(testtexdata), 16, 16, campos, modlmat)
+    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(testtexdata), 16, 16, campos, modlmat, U32view(dbuff))
 
     document.canvas.data:set_data(cdata)
 end
@@ -166,7 +168,7 @@ function get2dtriangleAABB(a, b, c)
     }
 end
 
-function rendertriangle(c, winsz, tex, texw, texh, campos, v1, v2, v3, p1, p2, p3)
+function rendertriangle(c, dbuff, winsz, tex, texw, texh, campos, v1, v2, v3, p1, p2, p3)
     local min, max = unpack(get2dtriangleAABB(p1, p2, p3))
 
     min = {math.clamp(min[1], 0, winsz[1]), math.clamp(min[2], 0, winsz[2])}
@@ -176,54 +178,61 @@ function rendertriangle(c, winsz, tex, texw, texh, campos, v1, v2, v3, p1, p2, p
         for i = math.floor(min[1]), math.ceil(max[1]) do
             local bc = getbarycoords(p1, p2, p3, {i, j})
             if bc ~= nil and bc[1] >= 0 and bc[1] <= 1 and bc[2] >= 0 and bc[2] <= 1 and bc[3] >= 0 and bc[3] <= 1 then
-                local x = bc[1] * v1[1][1] + bc[2] * v2[1][1] + bc[3] * v3[1][1]
-                local y = bc[1] * v1[1][2] + bc[2] * v2[1][2] + bc[3] * v3[1][2]
-                local z = bc[1] * v1[1][3] + bc[2] * v2[1][3] + bc[3] * v3[1][3]
+                local depth = bc[1] * p1[3] + bc[2] * p2[3] + bc[3] * p3[3]
 
-                local fragpos = {x, y, z}
+                local oldrawdepth =  dbuff[j * winsz[1] + i + 1]
+                if oldrawdepth ~= nil and depth < oldrawdepth / 0xFFFFFFFF then
+                    dbuff[j * winsz[1] + i + 1] = math.floor(depth) * 0xFFFFFFFF
 
-                local u = bc[1] * v1[2][1] + bc[2] * v2[2][1] + bc[3] * v3[2][1]
-                local v = bc[1] * v1[2][2] + bc[2] * v2[2][2] + bc[3] * v3[2][2]
+                    local x = bc[1] * v1[1][1] + bc[2] * v2[1][1] + bc[3] * v3[1][1]
+                    local y = bc[1] * v1[1][2] + bc[2] * v2[1][2] + bc[3] * v3[1][2]
+                    local z = bc[1] * v1[1][3] + bc[2] * v2[1][3] + bc[3] * v3[1][3]
 
-                u = (u - math.floor(u))
-                v = (v - math.floor(v))
+                    local fragpos = {x, y, z}
 
-                local nx = bc[1] * v1[3][1] + bc[2] * v2[3][1] + bc[3] * v3[3][1]
-                local ny = bc[1] * v1[3][2] + bc[2] * v2[3][2] + bc[3] * v3[3][2]
-                local nz = bc[1] * v1[3][3] + bc[2] * v2[3][3] + bc[3] * v3[3][3]
+                    local u = bc[1] * v1[2][1] + bc[2] * v2[2][1] + bc[3] * v3[2][1]
+                    local v = bc[1] * v1[2][2] + bc[2] * v2[2][2] + bc[3] * v3[2][2]
 
-                local fragnormal = vec3.normalize({nx, ny, nz})
+                    u = (u - math.floor(u))
+                    v = (v - math.floor(v))
 
-                local color = {0, 0, 0, 0}
+                    local nx = bc[1] * v1[3][1] + bc[2] * v2[3][1] + bc[3] * v3[3][1]
+                    local ny = bc[1] * v1[3][2] + bc[2] * v2[3][2] + bc[3] * v3[3][2]
+                    local nz = bc[1] * v1[3][3] + bc[2] * v2[3][3] + bc[3] * v3[3][3]
 
-                -- ==============================================================
-                
-                local resultlight = {0, 0, 0}
-                
-                for li = 1, #lights do
-                    local lightdata = lights[li]
+                    local fragnormal = vec3.normalize({nx, ny, nz})
 
-                    local distcolor = vec3.mul(lightdata[3], (1 - math.min(1, vec3.distance(fragpos, lightdata[1]) / lightdata[2])))
-                    local lightdir = vec3.normalize(vec3.sub(lightdata[1], fragpos))
+                    local color = {0, 0, 0, 0}
 
-                    local diffcoefficient = math.max(vec3.dot(fragnormal, lightdir), 0)
-                    local diffcolor = vec3.mul(distcolor, diffcoefficient)
+                    -- ==============================================================
+                    
+                    local resultlight = {0, 0, 0}
+                    
+                    for li = 1, #lights do
+                        local lightdata = lights[li]
 
-                    local viewdir = vec3.normalize(vec3.sub(campos, fragpos))
-                    local halfwaydir = vec3.normalize(vec3.add(lightdir, viewdir))
-                    local speccolor = vec3.mul(distcolor, math.max(vec3.dot(fragnormal, halfwaydir), 0) ^ shininess)
+                        local distcolor = vec3.mul(lightdata[3], (1 - math.min(1, vec3.distance(fragpos, lightdata[1]) / lightdata[2])))
+                        local lightdir = vec3.normalize(vec3.sub(lightdata[1], fragpos))
 
-                    vec3.add(resultlight, vec3.add(diffcolor, speccolor), resultlight)
+                        local diffcoefficient = math.max(vec3.dot(fragnormal, lightdir), 0)
+                        local diffcolor = vec3.mul(distcolor, diffcoefficient)
+
+                        local viewdir = vec3.normalize(vec3.sub(campos, fragpos))
+                        local halfwaydir = vec3.normalize(vec3.add(lightdir, viewdir))
+                        local speccolor = vec3.mul(distcolor, math.max(vec3.dot(fragnormal, halfwaydir), 0) ^ shininess)
+
+                        vec3.add(resultlight, vec3.add(diffcolor, speccolor), resultlight)
+                    end
+                    vec3.add(resultlight, ambientlight, resultlight)
+
+                    vec4.div(unpackRGBA(tex[math.floor(v * texh) * texw + math.floor(u * texw) + 1]), 255, color)
+                    vec4.mul(color, {resultlight[1], resultlight[2], resultlight[3], 1}, color)
+
+                    -- ==============================================================
+                    
+                    vec4.mul({math.clamp(color[1], 0, 1), math.clamp(color[2], 0, 1), math.clamp(color[3], 0, 1), math.clamp(color[4], 0, 1)}, 255, color)
+                    c[j * winsz[1] + i + 1] = packRGBA(math.floor(color[1]), math.floor(color[2]), math.floor(color[3]), math.floor(color[4]))
                 end
-                vec3.add(resultlight, ambientlight, resultlight)
-
-                vec4.div(unpackRGBA(tex[math.floor(v * texh) * texw + math.floor(u * texw) + 1]), 255, color)
-                vec4.mul(color, {resultlight[1], resultlight[2], resultlight[3], 1}, color)
-
-                -- ==============================================================
-                
-                vec4.mul({math.clamp(color[1], 0, 1), math.clamp(color[2], 0, 1), math.clamp(color[3], 0, 1), math.clamp(color[4], 0, 1)}, 255, color)
-                c[j * winsz[1] + i] = packRGBA(math.round(color[1]), math.round(color[2]), math.round(color[3]), math.round(color[4]))
             end
         end
     end
@@ -242,7 +251,7 @@ function unpackRGBA(rgba)
     }
 end
 
-function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelmat)
+function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelmat, dbuff)
     local points = {}
     local verts = {}
 
@@ -268,7 +277,7 @@ function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelm
             goto continue
         end
         
-        rendertriangle(canvas, winsz, tex, texw, texh, campos, verts[tri[1]], verts[tri[2]], verts[tri[3]], points[tri[1]], points[tri[2]], points[tri[3]])
+        rendertriangle(canvas, dbuff, winsz, tex, texw, texh, campos, verts[tri[1]], verts[tri[2]], verts[tri[3]], points[tri[1]], points[tri[2]], points[tri[3]])
 
         ::continue::
     end
