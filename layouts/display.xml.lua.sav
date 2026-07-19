@@ -1,0 +1,183 @@
+function on_open()
+    events.on(PACK_ID .. ":on_hud_render", on_render)
+end
+
+local cube = {
+    vertices = {
+        {-0.5, -0.5, -0.5},
+        {-0.5, -0.5, 0.5},
+        {0.5, -0.5, -0.5},
+        {0.5, -0.5, 0.5},
+
+        {0, 0.5, 0}
+    },
+    triangles = {
+        {1, 2, 4, {255, 0, 0}},
+        {4, 3, 1, {0, 255, 0}},
+
+        {3, 5, 1, {0, 0, 255}},
+        {4, 5, 3, {255, 255, 0}},
+        {2, 5, 4, {255, 128, 0}},
+        {1, 5, 2, {0, 255, 255}}
+    }
+}
+
+function on_render()
+    local winsz = gui.get_viewport()
+
+    if winsz[1] == 0 or winsz[2] == 0 then return end
+
+    document.root.wpos = {0, 0}
+    document.root.size = winsz
+
+    document.canvas.wpos = {0, 0}
+    document.canvas.size = winsz
+
+    local cam = cameras.get(player.get_camera(hud.get_player()))
+    local campos = cam:get_pos()
+
+    local projmat = mat4.perspective(cam:get_fov(), winsz[1] / winsz[2], 0.05, 1000)
+    local viewmat = mat4.look_at(campos, vec3.add(campos, cam:get_front()), cam:get_up())
+    
+    local modlmat = mat4.mul(mat4.rotate({0, 1, 0}, math.fmod(time.uptime() * 45, 360)), mat4.translate({0, 2 + math.sin(time.uptime()), 0}))
+    
+
+    local mvpmat = mat4.mul(projmat, mat4.mul(viewmat, modlmat))
+
+    document.canvas.data:clear(0, 0, 0, 0)
+
+    --[[
+    local p1 = project({0, 2, 0}, mvpmat, winsz)
+    if p1 == nil then return end
+    local p2 = project({5, 2, 0}, mvpmat, winsz)
+    if p2 == nil then return end
+    local p3 = project({2.5, 4, 2.5}, mvpmat, winsz)
+    if p3 == nil then return end
+    --local p4 = project({0, 2, 5}, mvpmat, winsz)
+    --if p4 == nil then return end
+
+    --document.canvas.data:line(p1[1], p1[2], p2[1], p2[2], 0, 0, 0)
+    rendertriangle(document.canvas.data, p1, p2, p3, {0, 0, 0})
+    ]]
+
+    rendermesh(cube, mvpmat, document.canvas.data, winsz)
+end
+
+function project(point, mvpmat, winsz)
+   local clipvec = mat4.mul(mvpmat, point)
+   if clipvec[4] <= 0 then return nil end
+
+   return {
+       (1 + clipvec[1] / clipvec[4]) * 0.5 * winsz[1],
+       (1 - clipvec[2] / clipvec[4]) * 0.5 * winsz[2],
+       (1 + clipvec[3] / clipvec[4]) * 0.5
+   }
+end
+
+--function hsv2rgb()
+
+function getbarycoords(v1, v2, v3, p)
+    local doublearea = math.abs((v2[1] - v1[1]) * (v3[2] - v1[2]) - (v3[1] - v1[1]) * (v2[2] - v1[2]))
+    if doublearea == 0 then return nil end
+
+    return {
+        ((v2[1] - p[1]) * (v3[2] - p[2]) - (v3[1] - p[1]) * (v2[2] - p[2])) / doublearea,
+        ((v3[1] - p[1]) * (v1[2] - p[2]) - (v1[1] - p[1]) * (v3[2] - p[2])) / doublearea,
+        ((v1[1] - p[1]) * (v2[2] - p[2]) - (v2[1] - p[1]) * (v1[2] - p[2])) / doublearea
+    }
+end
+
+function ispointintriangle(v1, v2, v3, p)
+    --[[
+    local doublearea = math.abs((v2[1] - v1[1]) * (v3[2] - v1[2]) - (v3[1] - v1[1]) * (v2[2] - v1[2]))
+    --if doublearea == 0 then return nil end
+    if doublearea == 0 then return false end
+    
+    
+    if (((v2[1] - p[1]) * (v3[2] - p[2]) - (v3[1] - p[1]) * (v2[2] - p[2])) / doublearea) < 0 or
+       (((v3[1] - p[1]) * (v1[2] - p[2]) - (v1[1] - p[1]) * (v3[2] - p[2])) / doublearea) < 0 or
+       (((v1[1] - p[1]) * (v2[2] - p[2]) - (v2[1] - p[1]) * (v1[2] - p[2])) / doublearea) < 0 then
+        return false
+    end
+    return true
+    ]]
+
+    local c = getbarycoords(v1, v2, v3, p)
+    if c == nil then return false end
+
+    return c[1] >= 0 and c[1] <= 1 and c[2] >= 0 and c[2] <= 1 and c[3] >= 0 and c[3] <= 1
+end
+
+function gettriangleAABB(v1, v2, v3)
+    return {
+        {math.min(v1[1], v2[1], v3[1]), math.min(v1[2], v2[2], v3[2])},
+        {math.max(v1[1], v2[1], v3[1]), math.max(v1[2], v2[2], v3[2])}
+    }
+end
+
+function rendertriangle(c, v1, v2, v3, color)
+    local min, max = unpack(gettriangleAABB(v1, v2, v3))
+    
+    for j = min[2], max[2] do
+        local startlinex = nil
+        local endlinex = nil
+        
+        for i = min[1], max[1] do
+            if startlinex == nil then
+                if ispointintriangle(v1, v2, v3, {i, j}) then startlinex = i end
+            else
+                if ispointintriangle(v1, v2, v3, {i, j}) then endlinex = i;
+                else break end
+            end
+        end
+        
+        --if startlinex ~= nil and endlinex ~= nil and ispointinwin(winsz, {startlinex, j}) and ispointinwin(winsz, {endlinex, j}) then
+        if startlinex ~= nil and endlinex ~= nil then
+            c:line(startlinex, j, endlinex, j, unpack(color))
+        end
+    end
+end
+
+--[[
+    <mesh> structure:
+    {
+        verices:
+        {
+            {x, y, z},
+            ...
+        },
+        triangles:
+        {
+            {v1, v2, v3, color},
+            ...
+        }
+    }
+]]
+
+function rendermesh(mesh, mvpmat, canvas, winsz)
+    local projverts = {}
+
+    for i = 1, #mesh.vertices do
+        local vec = project(mesh.vertices[i], mvpmat, winsz)
+        if vec == nil then return end
+        table.insert(projverts, vec)
+    end
+
+    for i = 1, #mesh.triangles do
+        local tri = mesh.triangles[i]
+
+        if tri[1] < 1 or tri[1] > #projverts or
+            tri[2] < 1 or tri[2] > #projverts or
+            tri[3] < 1 or tri[3] > #projverts then
+            goto continue
+        end
+
+        rendertriangle(canvas, projverts[tri[1]], projverts[tri[2]], projverts[tri[3]], tri[4])
+
+        ::continue::
+    end
+end
+
+function ispointinwin(winsz, point)
+    return point[1] >= 0 and point[2] >= 0 and point[1] < winsz[1] and point[2] < winsz[2]
+end

@@ -1,0 +1,218 @@
+local testtex = nil
+local testtexdata = nil
+
+function on_open()
+    testtex = assets.to_canvas("blocks:red_lamp")
+    --print("testtex: " .. testtex)
+
+    if testtex ~= nil then
+        testtexdata = testtex:get_data()
+    end
+
+    events.on(PACK_ID .. ":on_hud_render", on_render)
+end
+
+local cube = {
+    vertices = {
+        {{-0.5, -0.5, -0.5}, {0, 0}},
+        {{-0.5, -0.5, 0.5}, {0, 1}},
+        {{0.5, -0.5, -0.5}, {1, 0}},
+        {{0.5, -0.5, 0.5}, {1, 1}},
+
+        {{0, 0.5, 0}, {0.5, 0.5}}
+    },
+    triangles = {
+        {1, 2, 4,},
+        {4, 3, 1},
+
+        {3, 5, 1},
+        {4, 5, 3},
+        {2, 5, 4},
+        {1, 5, 2}
+    }
+}
+
+function on_render()
+    local winsz = gui.get_viewport()
+
+    if winsz[1] == 0 or winsz[2] == 0 then return end
+
+    document.root.wpos = {0, 0}
+    document.root.size = winsz
+
+    document.canvas.wpos = {0, 0}
+    document.canvas.size = winsz
+
+    local cam = cameras.get(player.get_camera(hud.get_player()))
+    local campos = cam:get_pos()
+
+    local projmat = mat4.perspective(cam:get_fov(), winsz[1] / winsz[2], 0.05, 1000)
+    local viewmat = mat4.look_at(campos, vec3.add(campos, cam:get_front()), cam:get_up())
+    
+    local modlmat = mat4.mul(
+        mat4.rotate({0, 1, 0}, math.fmod(time.uptime() * 45, 360)),
+        mat4.translate({0, 2 + math.sin(time.uptime()), 0})
+    )
+    
+
+    local mvpmat = mat4.mul(projmat, mat4.mul(viewmat, modlmat))
+
+    document.canvas.data:clear(0, 0, 0, 0)
+
+    local cdata = document.canvas.data:get_data()
+
+    rendermesh(cube, mvpmat, U32view(cdata), winsz, U32view(testtexdata), 16, 16)
+
+    document.canvas.data:set_data(cdata)
+end
+
+function project(point, mvpmat, winsz)
+   local clipvec = mat4.mul(mvpmat, point)
+   if clipvec[4] <= 0 then return nil end
+
+   return {
+       (1 + clipvec[1] / clipvec[4]) * 0.5 * winsz[1],
+       (1 - clipvec[2] / clipvec[4]) * 0.5 * winsz[2],
+       (1 + clipvec[3] / clipvec[4]) * 0.5
+   }
+end
+
+function hsv2rgb(h, s, v)
+    h = math.fmod(h, 360) -- maybe optimize it.
+    s = math.clamp(s, 0, 1) * 100
+    v = math.clamp(v, 0, 1) * 100
+
+    local hi = math.fmod(math.floor(h / 60), 6)
+    local vmin = ((100 - s) * v) / 100
+    local a = (v - vmin) * (math.fmod(h, 60) / 60)
+
+    local vinc = math.floor((vmin + a) * 2.56)
+    local vdec = math.floor((v - a) * 2.56)
+    v = math.floor(v * 2.56)
+    vmin = math.floor(vmin * 2.56)
+
+    if hi == 0 then
+        return {v, vinc, vmin}
+    elseif hi == 1 then
+        return {vdec, v, vmin}
+    elseif hi == 2 then
+        return {vmin, v, vinc}
+    elseif hi == 3 then
+        return {vmin, vdec, v}
+    elseif hi == 4 then
+        return {vinc, vmin, v}
+    elseif hi == 5 then
+        return {v, vmin, vdec}
+    end
+    return nil
+end
+
+function getbarycoords(a, b, c, p)
+    local doublearea = math.abs((b[1] - a[1]) * (c[2] - a[2]) - (c[1] - a[1]) * (b[2] - a[2]))
+    if doublearea == 0 then return nil end
+
+    return {
+        ((b[1] - p[1]) * (c[2] - p[2]) - (c[1] - p[1]) * (b[2] - p[2])) / doublearea,
+        ((c[1] - p[1]) * (a[2] - p[2]) - (a[1] - p[1]) * (c[2] - p[2])) / doublearea,
+        ((a[1] - p[1]) * (b[2] - p[2]) - (b[1] - p[1]) * (a[2] - p[2])) / doublearea
+    }
+end
+
+function ispointin2dtriangle(v1, v2, v3, p)
+    local c = getbarycoords(v1, v2, v3, p)
+    if c == nil then return false end
+
+    return c[1] >= 0 and c[1] <= 1 and c[2] >= 0 and c[2] <= 1 and c[3] >= 0 and c[3] <= 1
+end
+
+function get2dtriangleAABB(a, b, c)
+    return {
+        {math.min(a[1], b[1], c[1]), math.min(a[2], b[2], c[2])},
+        {math.max(a[1], b[1], c[1]), math.max(a[2], b[2], c[2])}
+    }
+end
+
+--[[
+    vertex structure:
+    {
+        {x, y},
+        {u, v}
+    }
+]]
+
+function rendertriangle(c, winsz, tex, texw, texh, v1, v2, v3)
+    local min, max = unpack(get2dtriangleAABB(v1[1], v2[1], v3[1]))
+
+    min = {math.clamp(min[1], 0, winsz[1]), math.clamp(min[2], 0, winsz[2])}
+    max = {math.clamp(max[1], 0, winsz[1]), math.clamp(max[2], 0, winsz[2])}
+    
+    for j = math.floor(min[2]), math.ceil(max[2]) do
+        for i = math.floor(min[1]), math.ceil(max[1]) do
+            local bc = getbarycoords(v1[1], v2[1], v3[1], {i, j})
+            if bc ~= nil and bc[1] >= 0 and bc[1] <= 1 and bc[2] >= 0 and bc[2] <= 1 and bc[3] >= 0 and bc[3] <= 1 then
+                local u = bc[1] * v1[2][1] + bc[2] * v2[2][1] + bc[3] * v3[2][1]
+                local v = bc[1] * v1[2][2] + bc[2] * v2[2][2] + bc[3] * v3[2][2]
+
+                u = (u - math.floor(u))
+                v = (v - math.floor(v))
+
+                local texpx = math.floor(u * texw)
+                local texpy = math.floor(v * texh)
+                --print(i, j)
+
+                --print(px, py)
+
+                c[j * winsz[1] + i] = tex[texpy * texw + texpx + 1]
+            end
+        end
+    end
+end
+
+--[[
+    <mesh> structure:
+    {
+        verices:
+        {
+            {{x, y, z}, {u, v}},
+            ...
+        },
+        triangles:
+        {
+            {v1, v2, v3},
+            ...
+        }
+    }
+]]
+
+function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh)
+    local projverts = {}
+
+    for i = 1, #mesh.vertices do
+        local vec = project(mesh.vertices[i][1], mvpmat, winsz)
+        if vec == nil then return end
+
+        local vertdata = {vec}
+        for j = 2, #mesh.vertices[i] do
+            table.insert(vertdata, mesh.vertices[i][j])
+        end
+        table.insert(projverts, vertdata)
+    end
+
+    for i = 1, #mesh.triangles do
+        local tri = mesh.triangles[i]
+
+        if tri[1] < 1 or tri[1] > #projverts or
+            tri[2] < 1 or tri[2] > #projverts or
+            tri[3] < 1 or tri[3] > #projverts then
+            goto continue
+        end
+        
+        rendertriangle(canvas, winsz, tex, texw, texh, projverts[tri[1]], projverts[tri[2]], projverts[tri[3]])
+
+        ::continue::
+    end
+end
+
+function ispointinwin(winsz, point)
+    return point[1] >= 0 and point[2] >= 0 and point[1] < winsz[1] and point[2] < winsz[2]
+end

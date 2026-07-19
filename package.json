@@ -1,0 +1,6 @@
+{
+    "id": "canvas3drenderer",
+    "title": "3D on-canvas renderer",
+    "description": "Complete 3D polygon models renderer with dynamic lightning support.",
+    "creator": "RomanDonw"
+}

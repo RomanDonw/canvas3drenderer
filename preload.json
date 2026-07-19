@@ -1,0 +1,9 @@
+{
+    "textures":
+    [
+        {
+            "name": "debugtexture",
+            "path": "textures/misc/texture"
+        }
+    ]
+}
