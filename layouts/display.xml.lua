@@ -171,18 +171,17 @@ end
 function rendertriangle(c, dbuff, winsz, tex, texw, texh, campos, v1, v2, v3, p1, p2, p3)
     local min, max = unpack(get2dtriangleAABB(p1, p2, p3))
 
-    min = {math.clamp(min[1], 0, winsz[1]), math.clamp(min[2], 0, winsz[2])}
-    max = {math.clamp(max[1], 0, winsz[1]), math.clamp(max[2], 0, winsz[2])}
+    min = {math.clamp(min[1], 0, winsz[1] - 1), math.clamp(min[2], 0, winsz[2] - 1)}
+    max = {math.clamp(max[1], 0, winsz[1] - 1), math.clamp(max[2], 0, winsz[2] - 1)}
     
     for j = math.floor(min[2]), math.ceil(max[2]) do
         for i = math.floor(min[1]), math.ceil(max[1]) do
             local bc = getbarycoords(p1, p2, p3, {i, j})
             if bc ~= nil and bc[1] >= 0 and bc[1] <= 1 and bc[2] >= 0 and bc[2] <= 1 and bc[3] >= 0 and bc[3] <= 1 then
                 local depth = bc[1] * p1[3] + bc[2] * p2[3] + bc[3] * p3[3]
-
                 local oldrawdepth =  dbuff[j * winsz[1] + i + 1]
                 if oldrawdepth ~= nil and depth < oldrawdepth / 0xFFFFFFFF then
-                    dbuff[j * winsz[1] + i + 1] = math.floor(depth) * 0xFFFFFFFF
+                    dbuff[j * winsz[1] + i + 1] = math.floor(depth * 0xFFFFFFFF)
 
                     local x = bc[1] * v1[1][1] + bc[2] * v2[1][1] + bc[3] * v3[1][1]
                     local y = bc[1] * v1[1][2] + bc[2] * v2[1][2] + bc[3] * v3[1][2]
@@ -239,7 +238,12 @@ function rendertriangle(c, dbuff, winsz, tex, texw, texh, campos, v1, v2, v3, p1
 end
 
 function packRGBA(r, g, b, a)
-    return bit.band(bit.bor(bit.band(r, 0xFF), bit.lshift(bit.band(g, 0xFF), 8), bit.lshift(bit.band(b, 0xFF), 16), bit.lshift(bit.band(a, 0xFF), 24)), 0xFFFFFFFF)
+    return bit.band(bit.bor(
+        bit.band(r, 0xFF),
+        bit.lshift(bit.band(g, 0xFF), 8),
+        bit.lshift(bit.band(b, 0xFF), 16),
+        bit.lshift(bit.band(a, 0xFF), 24)
+    ), 0xFFFFFFFF)
 end
 
 function unpackRGBA(rgba)
