@@ -8,12 +8,16 @@
 
 local near = 0.05
 local far = 1000
-local texturename = "debugtexture"
+
+local texturewidth = 1024
+local textureheight = 1024
+local texturename = "detalizedwall"
+local bumptexturename = "detalizedwall_bump" -- can be nil.
 
 local shininess = 32
 local ambientlight = {0.2, 0.2, 0.2}
 local lights = {
-    {{3, 3, 3}, 9, {13 / 15, 10 / 15, 2 / 15}},
+    {{3, 3, 3}, 100, {13 / 15, 10 / 15, 2 / 15}},
     {{3, 3, -3}, 14, {0, 0, 1}}
 }
 
@@ -42,12 +46,25 @@ local model = {
 local testtex = nil
 local testtexdata = nil
 
+local testtexbump = nil
+local testtexbumpdata = nil
+local testtexbumpdatau32view = nil
+
 function on_open()
     testtex = assets.to_canvas(texturename)
 
     if testtex ~= nil then
         testtexdata = testtex:get_data()
         console.chat("successfully loaded texture")
+
+        if bumptexturename ~= nil then
+            testtexbump = assets.to_canvas(bumptexturename)
+            if testtexbump ~= nil then
+                testtexbumpdata = testtexbump:get_data()
+                testtexbumpdatau32view = U32view(testtexbumpdata)
+                console.chat("successfully loaded bump texture")
+            end
+        end
 
         events.on(PACK_ID .. ":on_hud_render", on_render)
     end
@@ -81,7 +98,7 @@ function on_render()
     ]]
 
     local modlmat = mat4.idt()
-    mat4.mul(modlmat, mat4.translate({0, 2, 0}), modlmat)
+    mat4.mul(modlmat, mat4.translate({1, 2, 1}), modlmat)
     mat4.mul(modlmat, mat4.rotate({0, 1, 0}, math.fmod(time.uptime() * 45 * 2, 360)), modlmat)
     mat4.mul(modlmat, mat4.rotate({1, 0, 0}, math.fmod(time.uptime() * 45 * 2.5, 360)), modlmat)
     mat4.mul(modlmat, mat4.scale({1.5, 1.5, 1.5}), modlmat)
@@ -97,7 +114,7 @@ function on_render()
     document.canvas.data:clear(0)
     local cdata = document.canvas.data:get_data()
 
-    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(testtexdata), 16, 16, campos, modlmat, U32view(dbuff))
+    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(testtexdata), texturewidth, textureheight, campos, modlmat, U32view(dbuff), testtexbumpdatau32view)
 
     document.canvas.data:set_data(cdata)
 end
@@ -168,7 +185,8 @@ function get2dtriangleAABB(a, b, c)
     }
 end
 
-function rendertriangle(c, dbuff, winsz, tex, texw, texh, campos, v1, v2, v3, p1, p2, p3)
+-- <bumptex> can be nil.
+function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, campos, v1, v2, v3, p1, p2, p3)
     local min, max = unpack(get2dtriangleAABB(p1, p2, p3))
 
     min = {math.clamp(min[1], 0, winsz[1] - 1), math.clamp(min[2], 0, winsz[2] - 1)}
@@ -201,9 +219,25 @@ function rendertriangle(c, dbuff, winsz, tex, texw, texh, campos, v1, v2, v3, p1
 
                     local fragnormal = vec3.normalize({nx, ny, nz})
 
-                    local color = {0, 0, 0, 0}
+                    -- ==============================================================
+
+                    if bumptex ~= nil then
+                        --[[
+                        local brawnorm = unpackRGBA(bumptex[math.floor(v * texh) * texw + math.floor(u * texw) + 1])
+                        local bnorm = {normalizes8(cvtu8tos8(brawnorm[1])), normalizes8(cvtu8tos8(brawnorm[2])), normalizes8(cvtu8tos8(brawnorm[3]))}
+                        ]]
+
+                        local brawnorm = unpackRGBA(bumptex[math.floor(v * texh) * texw + math.floor(u * texw) + 1])
+                        local bnorm = vec3.sub(
+                            vec3.normalize(vec3.mul(vec3.div({brawnorm[1], brawnorm[2], brawnorm[3]}, {255, 255, 255}), {2, 2, 2})),
+                            {1, 1, 1}
+                        )
+                        vec3.normalize(vec3.add(fragnormal, bnorm), fragnormal)
+                    end
 
                     -- ==============================================================
+
+                    local color = {0, 0, 0, 0}
                     
                     local resultlight = {0, 0, 0}
                     
@@ -255,7 +289,7 @@ function unpackRGBA(rgba)
     }
 end
 
-function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelmat, dbuff)
+function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelmat, dbuff, bumptex)
     local points = {}
     local verts = {}
 
@@ -281,7 +315,7 @@ function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelm
             goto continue
         end
         
-        rendertriangle(canvas, dbuff, winsz, tex, texw, texh, campos, verts[tri[1]], verts[tri[2]], verts[tri[3]], points[tri[1]], points[tri[2]], points[tri[3]])
+        rendertriangle(canvas, dbuff, winsz, tex, bumptex, texw, texh, campos, verts[tri[1]], verts[tri[2]], verts[tri[3]], points[tri[1]], points[tri[2]], points[tri[3]])
 
         ::continue::
     end
@@ -293,4 +327,16 @@ end
 
 function map(norm, start, _end)
     return norm * (_end - start) + start
+end
+
+function cvtu8tos8(u8)
+    local v = bit.band(u8, 0xFF)
+    if v > 127 then return -(256 - v) end
+    return v
+end
+
+function normalizes8(s8)
+    local v = bit.band(s8, 0xFF)
+    if v < 0 then return v / 128 end
+    return v / 127
 end

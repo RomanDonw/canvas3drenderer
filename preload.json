@@ -4,6 +4,14 @@
         {
             "name": "debugtexture",
             "path": "textures/misc/texture"
+        },
+        {
+            "name": "detalizedwall",
+            "path": "textures/misc/detalizedwall"
+        },
+        {
+            "name": "detalizedwall_bump",
+            "path": "textures/misc/detalizedwall_bump"
         }
     ]
 }
