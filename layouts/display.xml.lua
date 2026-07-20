@@ -9,8 +9,6 @@
 local near = 0.05
 local far = 1000
 
-local texturewidth = 1024
-local textureheight = 1024
 local texturename = "detalizedwall"
 local bumptexturename = "detalizedwall_bump" -- can be nil.
 
@@ -114,7 +112,7 @@ function on_render()
     document.canvas.data:clear(0)
     local cdata = document.canvas.data:get_data()
 
-    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(testtexdata), texturewidth, textureheight, campos, modlmat, U32view(dbuff), testtexbumpdatau32view)
+    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(testtexdata), testtex.width, testtex.height, campos, modlmat, U32view(dbuff), testtexbumpdatau32view)
 
     document.canvas.data:set_data(cdata)
 end
@@ -227,7 +225,7 @@ function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, campos, v1, v
                         local bnorm = {normalizes8(cvtu8tos8(brawnorm[1])), normalizes8(cvtu8tos8(brawnorm[2])), normalizes8(cvtu8tos8(brawnorm[3]))}
                         ]]
 
-                        local brawnorm = unpackRGBA(bumptex[math.floor(v * texh) * texw + math.floor(u * texw) + 1])
+                        local brawnorm = unpackRGBA(gettexpixel(bumptex, texw, texh, u * texw, v * texh))
                         local bnorm = vec3.sub(
                             vec3.normalize(vec3.mul(vec3.div({brawnorm[1], brawnorm[2], brawnorm[3]}, {255, 255, 255}), {2, 2, 2})),
                             {1, 1, 1}
@@ -258,13 +256,15 @@ function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, campos, v1, v
                     end
                     vec3.add(resultlight, ambientlight, resultlight)
 
-                    vec4.div(unpackRGBA(tex[math.floor(v * texh) * texw + math.floor(u * texw) + 1]), 255, color)
+                    vec4.div(unpackRGBA(gettexpixel(tex, texw, texh, u * texw, v * texh)), 255, color)
                     vec4.mul(color, {resultlight[1], resultlight[2], resultlight[3], 1}, color)
 
                     -- ==============================================================
                     
                     vec4.mul({math.clamp(color[1], 0, 1), math.clamp(color[2], 0, 1), math.clamp(color[3], 0, 1), math.clamp(color[4], 0, 1)}, 255, color)
-                    c[j * winsz[1] + i + 1] = packRGBA(math.floor(color[1]), math.floor(color[2]), math.floor(color[3]), math.floor(color[4]))
+                    settexpixel(c, winsz[1], winsz[2], i, j,
+                        packRGBA(math.floor(color[1]), math.floor(color[2]), math.floor(color[3]), math.floor(color[4]))
+                    )
                 end
             end
         end
@@ -339,4 +339,12 @@ function normalizes8(s8)
     local v = bit.band(s8, 0xFF)
     if v < 0 then return v / 128 end
     return v / 127
+end
+
+function gettexpixel(tex, texw, texh, px, py)
+    return tex[math.clamp(math.floor(py), 0, texh - 1) * texw + math.clamp(math.floor(px), 0, texw - 1) + 1]
+end
+
+function settexpixel(tex, texw, texh, px, py, color)
+    tex[math.clamp(math.floor(py), 0, texh - 1) * texw + math.clamp(math.floor(px), 0, texw - 1) + 1] = bit.band(color, 0xFFFFFFFF)
 end
