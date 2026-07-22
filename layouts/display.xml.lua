@@ -19,25 +19,7 @@ local lights = {
     {{3, 3, -3}, 14, {0, 0, 1}}
 }
 
-local model = {
-    vertices = {
-        {{-0.5, -0.5, -0.5}, {0, 0}, {-1, -1, -1}},
-        {{-0.5, -0.5, 0.5}, {0, 1}, {-1, -1, 1}},
-        {{0.5, -0.5, -0.5}, {1, 0}, {1, -1, -1}},
-        {{0.5, -0.5, 0.5}, {1, 1}, {1, -1, 1}},
-
-        {{0, 0.5, 0}, {0.5, 0.5}, {0, 1, 0}}
-    },
-    triangles = {
-        {1, 2, 4},
-        {4, 3, 1},
-
-        {3, 5, 1},
-        {4, 5, 3},
-        {2, 5, 4},
-        {1, 5, 2}
-    }
-}
+local modelpath = PACK_ID .. ":models/plane.json"
 
 -- ==============================================================
 
@@ -47,6 +29,8 @@ local testtexdata = nil
 local testtexbump = nil
 local testtexbumpdata = nil
 local testtexbumpdatau32view = nil
+
+local model = nil
 
 function on_open()
     testtex = assets.to_canvas(texturename)
@@ -62,6 +46,10 @@ function on_open()
                 testtexbumpdatau32view = U32view(testtexbumpdata)
                 console.chat("successfully loaded bump texture")
             end
+        end
+
+        if file.exists(modelpath) then
+            model = json.parse(file.read(modelpath))
         end
 
         events.on(PACK_ID .. ":on_hud_render", on_render)
@@ -81,6 +69,8 @@ function on_render()
 
     document.canvas.wpos = {0, 0}
     document.canvas.size = winsz
+
+    if model == nil then return end
 
     local cam = cameras.get(player.get_camera(hud.get_player()))
     local campos = cam:get_pos()
