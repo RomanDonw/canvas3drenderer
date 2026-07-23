@@ -98,72 +98,6 @@ function on_render()
     document.canvas.data:set_data(cdata)
 end
 
-function project(point, mvpmat, winsz)
-   local clipvec = mat4.mul(mvpmat, point)
-   if clipvec[4] <= 0 then return nil end
-
-   return {
-       (1 + clipvec[1] / clipvec[4]) * 0.5 * winsz[1],
-       (1 - clipvec[2] / clipvec[4]) * 0.5 * winsz[2],
-       (1 + clipvec[3] / clipvec[4]) * 0.5
-   }
-end
-
-function hsv2rgb(h, s, v)
-    h = math.fmod(h, 360) -- maybe optimize it.
-    s = math.clamp(s, 0, 1) * 100
-    v = math.clamp(v, 0, 1) * 100
-
-    local hi = math.fmod(math.floor(h / 60), 6)
-    local vmin = ((100 - s) * v) / 100
-    local a = (v - vmin) * (math.fmod(h, 60) / 60)
-
-    local vinc = math.floor((vmin + a) * 2.56)
-    local vdec = math.floor((v - a) * 2.56)
-    v = math.floor(v * 2.56)
-    vmin = math.floor(vmin * 2.56)
-
-    if hi == 0 then
-        return {v, vinc, vmin}
-    elseif hi == 1 then
-        return {vdec, v, vmin}
-    elseif hi == 2 then
-        return {vmin, v, vinc}
-    elseif hi == 3 then
-        return {vmin, vdec, v}
-    elseif hi == 4 then
-        return {vinc, vmin, v}
-    elseif hi == 5 then
-        return {v, vmin, vdec}
-    end
-    return nil
-end
-
-function getbarycoords(a, b, c, p)
-    local doublearea = math.abs((b[1] - a[1]) * (c[2] - a[2]) - (c[1] - a[1]) * (b[2] - a[2]))
-    if doublearea == 0 then return nil end
-
-    return {
-        ((b[1] - p[1]) * (c[2] - p[2]) - (c[1] - p[1]) * (b[2] - p[2])) / doublearea,
-        ((c[1] - p[1]) * (a[2] - p[2]) - (a[1] - p[1]) * (c[2] - p[2])) / doublearea,
-        ((a[1] - p[1]) * (b[2] - p[2]) - (b[1] - p[1]) * (a[2] - p[2])) / doublearea
-    }
-end
-
-function ispointin2dtriangle(v1, v2, v3, p)
-    local c = getbarycoords(v1, v2, v3, p)
-    if c == nil then return false end
-
-    return c[1] >= 0 and c[1] <= 1 and c[2] >= 0 and c[2] <= 1 and c[3] >= 0 and c[3] <= 1
-end
-
-function get2dtriangleAABB(a, b, c)
-    return {
-        {math.min(a[1], b[1], c[1]), math.min(a[2], b[2], c[2])},
-        {math.max(a[1], b[1], c[1]), math.max(a[2], b[2], c[2])}
-    }
-end
-
 -- <bumptex> can be nil.
 function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, campos, v1, v2, v3, p1, p2, p3)
     local min, max = unpack(get2dtriangleAABB(p1, p2, p3))
@@ -252,24 +186,6 @@ function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, campos, v1, v
     end
 end
 
-function packRGBA(r, g, b, a)
-    return bit.band(bit.bor(
-        bit.band(r, 0xFF),
-        bit.lshift(bit.band(g, 0xFF), 8),
-        bit.lshift(bit.band(b, 0xFF), 16),
-        bit.lshift(bit.band(a, 0xFF), 24)
-    ), 0xFFFFFFFF)
-end
-
-function unpackRGBA(rgba)
-    return {
-        bit.band(rgba, 0xFF),
-        bit.band(bit.rshift(rgba, 8), 0xFF),
-        bit.band(bit.rshift(rgba, 16), 0xFF),
-        bit.band(bit.rshift(rgba, 24), 0xFF)
-    }
-end
-
 function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelmat, dbuff, bumptex)
     local points = {}
     local verts = {}
@@ -302,24 +218,33 @@ function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelm
     end
 end
 
-function ispointinwin(winsz, point)
-    return point[1] >= 0 and point[2] >= 0 and point[1] < winsz[1] and point[2] < winsz[2]
+function project(point, mvpmat, winsz)
+   local clipvec = mat4.mul(mvpmat, point)
+   if clipvec[4] <= 0 then return nil end
+
+   return {
+       (1 + clipvec[1] / clipvec[4]) * 0.5 * winsz[1],
+       (1 - clipvec[2] / clipvec[4]) * 0.5 * winsz[2],
+       (1 + clipvec[3] / clipvec[4]) * 0.5
+   }
 end
 
-function map(norm, start, _end)
-    return norm * (_end - start) + start
+function getbarycoords(a, b, c, p)
+    local doublearea = math.abs((b[1] - a[1]) * (c[2] - a[2]) - (c[1] - a[1]) * (b[2] - a[2]))
+    if doublearea == 0 then return nil end
+
+    return {
+        ((b[1] - p[1]) * (c[2] - p[2]) - (c[1] - p[1]) * (b[2] - p[2])) / doublearea,
+        ((c[1] - p[1]) * (a[2] - p[2]) - (a[1] - p[1]) * (c[2] - p[2])) / doublearea,
+        ((a[1] - p[1]) * (b[2] - p[2]) - (b[1] - p[1]) * (a[2] - p[2])) / doublearea
+    }
 end
 
-function cvtu8tos8(u8)
-    local v = bit.band(u8, 0xFF)
-    if v > 127 then return -(256 - v) end
-    return v
-end
-
-function normalizes8(s8)
-    local v = bit.band(s8, 0xFF)
-    if v < 0 then return v / 128 end
-    return v / 127
+function get2dtriangleAABB(a, b, c)
+    return {
+        {math.min(a[1], b[1], c[1]), math.min(a[2], b[2], c[2])},
+        {math.max(a[1], b[1], c[1]), math.max(a[2], b[2], c[2])}
+    }
 end
 
 function gettexpixel(tex, texw, texh, px, py)
@@ -328,4 +253,45 @@ end
 
 function settexpixel(tex, texw, texh, px, py, color)
     tex[math.clamp(math.floor(py), 0, texh - 1) * texw + math.clamp(math.floor(px), 0, texw - 1) + 1] = bit.band(color, 0xFFFFFFFF)
+end
+
+function hsv2rgb(h, s, v)
+    h = math.fmod(h, 360) -- maybe optimize it.
+    s = math.clamp(s, 0, 1) * 100
+    v = math.clamp(v, 0, 1) * 100
+
+    local hi = math.fmod(math.floor(h / 60), 6)
+    local vmin = ((100 - s) * v) / 100
+    local a = (v - vmin) * (math.fmod(h, 60) / 60)
+
+    local vinc = math.floor((vmin + a) * 2.56)
+    local vdec = math.floor((v - a) * 2.56)
+    v = math.floor(v * 2.56)
+    vmin = math.floor(vmin * 2.56)
+
+    if hi == 0 then
+        return {v, vinc, vmin}
+    elseif hi == 1 then
+        return {vdec, v, vmin}
+    elseif hi == 2 then
+        return {vmin, v, vinc}
+    elseif hi == 3 then
+        return {vmin, vdec, v}
+    elseif hi == 4 then
+        return {vinc, vmin, v}
+    elseif hi == 5 then
+        return {v, vmin, vdec}
+    end
+    return nil
+end
+
+packRGBA = bit.compile("(r & 0xFF) | ((g & 0xFF) << 8) | ((b & 0xFF) << 16) | ((a & 0xFF) << 24)", {"r", "g", "b", "a"}, true)
+
+function unpackRGBA(rgba)
+    return {
+        bit.band(rgba, 0xFF),
+        bit.band(bit.rshift(rgba, 8), 0xFF),
+        bit.band(bit.rshift(rgba, 16), 0xFF),
+        bit.band(bit.rshift(rgba, 24), 0xFF)
+    }
 end
