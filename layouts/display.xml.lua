@@ -6,6 +6,8 @@
 
 -- ========================== SETTINGS ==========================
 
+local mat3 = require "mat3"
+
 local near = 0.05
 local far = 1000
 
@@ -54,6 +56,8 @@ function on_open()
 
         events.on(PACK_ID .. ":on_hud_render", on_render)
     end
+
+    print(table.tostring(mat3.mul(mat3.translate({1, -5}), {2, 1, 1})))
 end
 
 function on_render()
