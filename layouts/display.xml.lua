@@ -19,7 +19,7 @@ local lights = {
     {{3, 3, -3}, 14, {0, 0, 1}}
 }
 
-local modelpath = PACK_ID .. ":models/plane.json"
+local modelpath = PACK_ID .. ":models/pyramid.json"
 
 -- ==============================================================
 
@@ -77,13 +77,6 @@ function on_render()
 
     local projmat = mat4.perspective(cam:get_fov(), winsz[1] / winsz[2], near, far)
     local viewmat = mat4.look_at(campos, vec3.add(campos, cam:get_front()), cam:get_up())
-   
-    --[[
-    local modlmat = mat4.mul(
-        mat4.rotate({0, 1, 0}, math.fmod(time.uptime() * 45, 360)),
-        mat4.translate({0, 2 + math.sin(time.uptime()), 0})
-    )
-    ]]
 
     local modlmat = mat4.idt()
     mat4.mul(modlmat, mat4.translate({1, 2, 1}), modlmat)
@@ -91,18 +84,16 @@ function on_render()
     mat4.mul(modlmat, mat4.rotate({1, 0, 0}, math.fmod(time.uptime() * 45 * 2.5, 360)), modlmat)
     mat4.mul(modlmat, mat4.scale({1.5, 1.5, 1.5}), modlmat)
 
-    --local modlmat = mat4.translate({0, 2 + math.sin(time.uptime()), 0})
-    
-
     local mvpmat = mat4.mul(projmat, mat4.mul(viewmat, modlmat))
 
-    document.canvas.data:clear(255, 255, 255, 255)
+    document.canvas.data:clear(0x3F800000) -- hex single-precision floating representation of 1.
     local dbuff = document.canvas.data:get_data()
 
-    document.canvas.data:clear(0)
+    --document.canvas.data:clear(0xFF003040)
+    document.canvas.data:clear()
     local cdata = document.canvas.data:get_data()
 
-    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(testtexdata), testtex.width, testtex.height, campos, modlmat, U32view(dbuff), testtexbumpdatau32view)
+    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(testtexdata), testtex.width, testtex.height, campos, modlmat, F32view(dbuff), testtexbumpdatau32view)
 
     document.canvas.data:set_data(cdata)
 end
@@ -185,9 +176,9 @@ function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, campos, v1, v
             local bc = getbarycoords(p1, p2, p3, {i, j})
             if bc ~= nil and bc[1] >= 0 and bc[1] <= 1 and bc[2] >= 0 and bc[2] <= 1 and bc[3] >= 0 and bc[3] <= 1 then
                 local depth = bc[1] * p1[3] + bc[2] * p2[3] + bc[3] * p3[3]
-                local oldrawdepth =  dbuff[j * winsz[1] + i + 1]
-                if oldrawdepth ~= nil and depth < oldrawdepth / 0xFFFFFFFF then
-                    dbuff[j * winsz[1] + i + 1] = math.floor(depth * 0xFFFFFFFF)
+                local oldrawdepth = dbuff[j * winsz[1] + i + 1]
+                if oldrawdepth ~= nil and depth < oldrawdepth then
+                    dbuff[j * winsz[1] + i + 1] = depth
 
                     local x = bc[1] * v1[1][1] + bc[2] * v2[1][1] + bc[3] * v3[1][1]
                     local y = bc[1] * v1[1][2] + bc[2] * v2[1][2] + bc[3] * v3[1][2]
