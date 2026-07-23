@@ -205,16 +205,12 @@ function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelm
     for i = 1, #mesh.triangles do
         local tri = mesh.triangles[i]
 
-        -- optimize it without using 'goto' keyword.
-        if tri[1] < 1 or tri[1] > #mesh.vertices or
-            tri[2] < 1 or tri[2] > #mesh.vertices or
-            tri[3] < 1 or tri[3] > #mesh.vertices then
-            goto continue
+        if tri[1] > 0 or tri[1] <= #mesh.vertices or
+            tri[2] > 0 or tri[2] <= #mesh.vertices or
+            tri[3] > 0 or tri[3] <= #mesh.vertices
+        then
+            rendertriangle(canvas, dbuff, winsz, tex, bumptex, texw, texh, campos, verts[tri[1]], verts[tri[2]], verts[tri[3]], points[tri[1]], points[tri[2]], points[tri[3]])
         end
-        
-        rendertriangle(canvas, dbuff, winsz, tex, bumptex, texw, texh, campos, verts[tri[1]], verts[tri[2]], verts[tri[3]], points[tri[1]], points[tri[2]], points[tri[3]])
-
-        ::continue::
     end
 end
 
