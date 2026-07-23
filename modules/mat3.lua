@@ -33,9 +33,19 @@ function mat3.mul(a, b)
             v31, v32, v33
         }
     elseif #b >= 3 then
-        local x = a[1] * b[1] + a[2] * b[1] + a[3] * b[1]
-        local y = a[4] * b[2] + a[5] * b[2] + a[6] * b[2]
-        local z = a[7] * b[3] + a[8] * b[3] + a[9] * b[3]
+        --[[
+                                | b[1] |
+                                | b[2] |
+                                | b[3] |
+        
+            | a[1] a[2] a[3] |  |  x   |
+            | a[4] a[5] a[6] |  |  y   |
+            | a[7] a[8] a[9] |  |  z   |
+        ]]
+        
+        local x = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
+        local y = a[4] * b[1] + a[5] * b[2] + a[6] * b[3]
+        local z = a[7] * b[1] + a[8] * b[2] + a[9] * b[3]
         return {x, y, z}
     else
         error("incorrect second argument length")
