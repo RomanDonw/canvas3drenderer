@@ -135,11 +135,6 @@ function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, campos, v1, v
                     -- ==============================================================
 
                     if bumptex ~= nil then
-                        --[[
-                        local brawnorm = unpackRGBA(bumptex[math.floor(v * texh) * texw + math.floor(u * texw) + 1])
-                        local bnorm = {normalizes8(cvtu8tos8(brawnorm[1])), normalizes8(cvtu8tos8(brawnorm[2])), normalizes8(cvtu8tos8(brawnorm[3]))}
-                        ]]
-
                         local brawnorm = unpackRGBA(gettexpixel(bumptex, texw, texh, u * texw, v * texh))
                         local bnorm = vec3.sub(
                             vec3.normalize(vec3.mul(vec3.div({brawnorm[1], brawnorm[2], brawnorm[3]}, {255, 255, 255}), {2, 2, 2})),
@@ -281,7 +276,14 @@ function hsv2rgb(h, s, v)
     return nil
 end
 
-packRGBA = bit.compile("(r & 0xFF) | ((g & 0xFF) << 8) | ((b & 0xFF) << 16) | ((a & 0xFF) << 24)", {"r", "g", "b", "a"}, true)
+function packRGBA(r, g, b, a)
+    return bit.band(bit.bor(
+        bit.band(r, 0xFF),
+        bit.lshift(bit.band(g, 0xFF), 8),
+        bit.lshift(bit.band(b, 0xFF), 16),
+        bit.lshift(bit.band(a, 0xFF), 24)
+    ), 0xFFFFFFFF)
+end
 
 function unpackRGBA(rgba)
     return {
