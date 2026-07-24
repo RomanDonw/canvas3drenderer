@@ -6,6 +6,7 @@
 
 -- ========================== SETTINGS ==========================
 
+require "globvars"
 local mat3 = require "mat3"
 
 local near = 0.05
@@ -34,6 +35,8 @@ local testtexbumpdatau32view = nil
 
 local model = nil
 
+local scl = 1
+
 function on_open()
     testtex = assets.to_canvas(texturename)
 
@@ -55,6 +58,15 @@ function on_open()
         end
 
         events.on(PACK_ID .. ":on_hud_render", on_render)
+
+        input.add_callback(PACK_ID .. ".modeltransform", function()
+            if hud.is_open(PACK_ID .. ":modeltransform") then
+                hud.close(PACK_ID .. ":modeltransform")
+            else
+                hud.show_overlay(PACK_ID .. ":modeltransform")
+            end
+            return true
+        end, document.root)
     end
 end
 
@@ -81,10 +93,15 @@ function on_render()
     local viewmat = mat4.look_at(campos, vec3.add(campos, cam:get_front()), cam:get_up())
 
     local modlmat = mat4.idt()
-    mat4.mul(modlmat, mat4.translate({1, 2, 1}), modlmat)
-    mat4.mul(modlmat, mat4.rotate({0, 1, 0}, math.fmod(time.uptime() * 45 * 2, 360)), modlmat)
-    mat4.mul(modlmat, mat4.rotate({1, 0, 0}, math.fmod(time.uptime() * 45 * 2.5, 360)), modlmat)
-    mat4.mul(modlmat, mat4.scale({1.5, 1.5, 1.5}), modlmat)
+    mat4.mul(modlmat, mat4.translate({globvars.model.x, globvars.model.y, globvars.model.z}), modlmat)
+    --mat4.mul(modlmat, mat4.rotate({0, 1, 0}, math.fmod(time.uptime() * 45 * 2, 360)), modlmat)
+    --mat4.mul(modlmat, mat4.rotate({1, 0, 0}, math.fmod(time.uptime() * 45 * 2.5, 360)), modlmat)
+    mat4.mul(modlmat, mat4.rotate({1, 0, 0}, globvars.model.rx), modlmat)
+    mat4.mul(modlmat, mat4.rotate({0, 1, 0}, globvars.model.ry), modlmat)
+    mat4.mul(modlmat, mat4.rotate({0, 0, 1}, globvars.model.rz), modlmat)
+    mat4.mul(modlmat, mat4.scale({globvars.model.sx, globvars.model.sy, globvars.model.sz}), modlmat)
+
+    --local texmat = mat3.mul((mat3.translate{globvars.texture.0.5, globvars.texture.y + 0.5}), mat3.rotate({globvars.texture.rx, globvars.texture.ry}))
 
     local mvpmat = mat4.mul(projmat, mat4.mul(viewmat, modlmat))
 
@@ -95,13 +112,13 @@ function on_render()
     document.canvas.data:clear()
     local cdata = document.canvas.data:get_data()
 
-    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(testtexdata), testtex.width, testtex.height, campos, modlmat, F32view(dbuff), testtexbumpdatau32view)
+    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(testtexdata), testtex.width, testtex.height, campos, modlmat, F32view(dbuff), testtexbumpdatau32view, texmat)
 
     document.canvas.data:set_data(cdata)
 end
 
 -- <bumptex> can be nil.
-function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, campos, v1, v2, v3, p1, p2, p3)
+function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, texmat, campos, v1, v2, v3, p1, p2, p3)
     local min, max = unpack(get2dtriangleAABB(p1, p2, p3))
 
     min = {math.clamp(min[1], 0, winsz[1] - 1), math.clamp(min[2], 0, winsz[2] - 1)}
@@ -124,6 +141,8 @@ function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, campos, v1, v
 
                     local u = bc[1] * v1[2][1] + bc[2] * v2[2][1] + bc[3] * v3[2][1]
                     local v = bc[1] * v1[2][2] + bc[2] * v2[2][2] + bc[3] * v3[2][2]
+
+                    u, v = unpack(mat3.mul(texmat, {u, v}))
 
                     u = (u - math.floor(u))
                     v = (v - math.floor(v))
@@ -183,7 +202,7 @@ function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, campos, v1, v
     end
 end
 
-function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelmat, dbuff, bumptex)
+function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelmat, dbuff, bumptex, texmat)
     local points = {}
     local verts = {}
 
@@ -206,7 +225,7 @@ function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelm
             tri[2] > 0 or tri[2] <= #mesh.vertices or
             tri[3] > 0 or tri[3] <= #mesh.vertices
         then
-            rendertriangle(canvas, dbuff, winsz, tex, bumptex, texw, texh, campos, verts[tri[1]], verts[tri[2]], verts[tri[3]], points[tri[1]], points[tri[2]], points[tri[3]])
+            rendertriangle(canvas, dbuff, winsz, tex, bumptex, texw, texh, texmat, campos, verts[tri[1]], verts[tri[2]], verts[tri[3]], points[tri[1]], points[tri[2]], points[tri[3]])
         end
     end
 end
