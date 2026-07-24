@@ -92,8 +92,7 @@ function on_render()
     local projmat = mat4.perspective(cam:get_fov(), winsz[1] / winsz[2], near, far)
     local viewmat = mat4.look_at(campos, vec3.add(campos, cam:get_front()), cam:get_up())
 
-    local modlmat = mat4.idt()
-    mat4.mul(modlmat, mat4.translate({globvars.model.x, globvars.model.y, globvars.model.z}), modlmat)
+    local modlmat = mat4.translate({globvars.model.x, globvars.model.y, globvars.model.z})
     --mat4.mul(modlmat, mat4.rotate({0, 1, 0}, math.fmod(time.uptime() * 45 * 2, 360)), modlmat)
     --mat4.mul(modlmat, mat4.rotate({1, 0, 0}, math.fmod(time.uptime() * 45 * 2.5, 360)), modlmat)
     mat4.mul(modlmat, mat4.rotate({1, 0, 0}, globvars.model.rx), modlmat)
@@ -101,7 +100,10 @@ function on_render()
     mat4.mul(modlmat, mat4.rotate({0, 0, 1}, globvars.model.rz), modlmat)
     mat4.mul(modlmat, mat4.scale({globvars.model.sx, globvars.model.sy, globvars.model.sz}), modlmat)
 
-    --local texmat = mat3.mul((mat3.translate{globvars.texture.0.5, globvars.texture.y + 0.5}), mat3.rotate({globvars.texture.rx, globvars.texture.ry}))
+    local texmat = mat3.translate({globvars.texture.x + 0.5, globvars.texture.y + 0.5})
+    texmat = mat3.mul(texmat, mat3.rotate(globvars.texture.rot))
+    texmat = mat3.mul(texmat, mat3.translate({-0.5, -0.5}))
+    texmat = mat3.mul(texmat, mat3.scale({globvars.texture.sx, globvars.texture.sy}))
 
     local mvpmat = mat4.mul(projmat, mat4.mul(viewmat, modlmat))
 

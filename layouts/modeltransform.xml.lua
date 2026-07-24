@@ -18,8 +18,7 @@ function on_open()
     document.slidetexx.text = "" .. globvars.texture.x
     document.slidetexy.text = "" .. globvars.texture.y
     
-    updtexrx(globvars.texture.rx)
-    updtexry(globvars.texture.ry)
+    updtexrot(globvars.texture.rot)
 
     document.slidetexsx.text = "" .. globvars.texture.sx
     document.slidetexsy.text = "" .. globvars.texture.sy
@@ -72,16 +71,9 @@ end
 
 -- =====================================================
 
-function updtexrx(v)
+function updtexrot(v)
     local a = math.clamp(tonumber(v), 0, 360)
-    document.slidetexrx.value = a
-    document.texrxtext.text = "Texture X rotation: " .. round(a, 4)
-    globvars.texture.rx = a
-end
-
-function updtexry(v)
-    local a = math.clamp(tonumber(v), 0, 360)
-    document.slidetexry.value = a
-    document.texrytext.text = "Texture Y rotation: " .. round(a, 4)
-    globvars.texture.ry = a
+    document.slidetexrot.value = a
+    document.texrottext.text = "Texture rotation: " .. round(a, 4)
+    globvars.texture.rot = a
 end

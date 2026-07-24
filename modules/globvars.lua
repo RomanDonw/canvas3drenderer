@@ -2,8 +2,8 @@ globvars =
 {
     model =
     {
-        x = 0,
-        y = 0,
+        x = 1,
+        y = 2,
         z = 0,
 
         rx = 0,
@@ -19,8 +19,7 @@ globvars =
         x = 0,
         y = 0,
 
-        rx = 0,
-        ry = 0,
+        rot = 0,
 
         sx = 1,
         sy = 1,

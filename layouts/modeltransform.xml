@@ -8,6 +8,8 @@
     <label autoresize="true" text-align="center">Model Z offset:</label>
     <textbox id="slidemdlz" validator="validnum" consumer="function(v) globvars.model.z = tonumber(v) end"></textbox>
 
+    <label autoresize="true" text-align="center">==================================================</label>
+
     <label id="mdlrxtext" autoresize="true" text-align="center"></label>
     <trackbar id="slidemdlrx" min="0" max="360" step="0.001" value="0" consumer="updmdlrx"></trackbar>
 
@@ -16,6 +18,8 @@
 
     <label id="mdlrztext" autoresize="true" text-align="center"></label>
     <trackbar id="slidemdlrz" min="0" max="360" step="0.001" value="0" consumer="updmdlrz"></trackbar>
+
+    <label autoresize="true" text-align="center">==================================================</label>
 
     <label autoresize="true" text-align="center">Model X scale:</label>
     <textbox id="slidemdlsx" validator="validonlyposnum" consumer="function(v) globvars.model.sx = tonumber(v) end"></textbox>
@@ -27,6 +31,9 @@
     <textbox id="slidemdlsz" validator="validonlyposnum" consumer="function(v) globvars.model.sz = tonumber(v) end"></textbox>
 
     <!-- ======================================================================================================================== -->
+    <label autoresize="true" text-align="center">==================================================</label>
+    <label autoresize="true" text-align="center">--------------------------------------------------</label>
+    <label autoresize="true" text-align="center">==================================================</label>
 
     <label autoresize="true" text-align="center">Texture X offset:</label>
     <textbox id="slidetexx" validator="validnum" consumer="function(v) globvars.texture.x = tonumber(v) end"></textbox>
@@ -34,11 +41,12 @@
     <label autoresize="true" text-align="center">Texture Y offset:</label>
     <textbox id="slidetexy" validator="validnum" consumer="function(v) globvars.texture.y = tonumber(v) end"></textbox>
 
-    <label id="texrxtext" autoresize="true" text-align="center"></label>
-    <trackbar id="slidetexrx" min="0" max="360" step="0.001" value="0" consumer="updtexrx"></trackbar>
+    <label autoresize="true" text-align="center">==================================================</label>
 
-    <label id="texrytext" autoresize="true" text-align="center"></label>
-    <trackbar id="slidetexry" min="0" max="360" step="0.001" value="0" consumer="updtexry"></trackbar>
+    <label id="texrottext" autoresize="true" text-align="center"></label>
+    <trackbar id="slidetexrot" min="0" max="360" step="0.001" value="0" consumer="updtexrot"></trackbar>
+
+    <label autoresize="true" text-align="center">==================================================</label>
 
     <label autoresize="true" text-align="center">Texture X scale:</label>
     <textbox id="slidetexsx" validator="validonlyposnum" consumer="function(v) globvars.texture.sx = tonumber(v) end"></textbox>
