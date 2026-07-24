@@ -1,54 +1,69 @@
 local mat3 = {}
 
 function mat3.mul(a, b)
-    if #a < 9 then error("first argument must be 3x3 matrix") end
+    if #a < 9 then error("incorrect first argument length") end
 
-    if #b >= 9 then
-        --[[
-                                | b[1] b[2] b[3] |
-                                | b[4] b[5] b[6] |
-                                | b[7] b[8] b[9] |
+    local btype = type(b)
+    if btype == "table" then
+        if #b >= 9 then
+            --[[
+                                    | b[1] b[2] b[3] |
+                                    | b[4] b[5] b[6] |
+                                    | b[7] b[8] b[9] |
 
-            | a[1] a[2] a[3] |  | v11  v12  v13  |
-            | a[4] a[5] a[6] |  | v21  v22  v23  |
-            | a[7] a[8] a[9] |  | v31  v32  v33  |
-        ]]
+                | a[1] a[2] a[3] |  | v11  v12  v13  |
+                | a[4] a[5] a[6] |  | v21  v22  v23  |
+                | a[7] a[8] a[9] |  | v31  v32  v33  |
+            ]]
 
-        local v11 = a[1] * b[1] + a[2] * b[4] + a[3] * b[7]
-        local v12 = a[1] * b[2] + a[2] * b[5] + a[3] * b[8]
-        local v13 = a[1] * b[3] + a[2] * b[6] + a[3] * b[9]
+            local v11 = a[1] * b[1] + a[2] * b[4] + a[3] * b[7]
+            local v12 = a[1] * b[2] + a[2] * b[5] + a[3] * b[8]
+            local v13 = a[1] * b[3] + a[2] * b[6] + a[3] * b[9]
 
-        local v21 = a[4] * b[1] + a[5] * b[4] + a[6] * b[7]
-        local v22 = a[4] * b[2] + a[5] * b[5] + a[6] * b[8]
-        local v23 = a[4] * b[3] + a[5] * b[6] + a[6] * b[9]
+            local v21 = a[4] * b[1] + a[5] * b[4] + a[6] * b[7]
+            local v22 = a[4] * b[2] + a[5] * b[5] + a[6] * b[8]
+            local v23 = a[4] * b[3] + a[5] * b[6] + a[6] * b[9]
 
-        local v31 = a[7] * b[1] + a[8] * b[4] + a[9] * b[7]
-        local v32 = a[7] * b[2] + a[8] * b[5] + a[9] * b[8]
-        local v33 = a[7] * b[3] + a[8] * b[6] + a[9] * b[9]
+            local v31 = a[7] * b[1] + a[8] * b[4] + a[9] * b[7]
+            local v32 = a[7] * b[2] + a[8] * b[5] + a[9] * b[8]
+            local v33 = a[7] * b[3] + a[8] * b[6] + a[9] * b[9]
 
+            return
+            {
+                v11, v12, v13,
+                v21, v22, v23,
+                v31, v32, v33
+            }
+        elseif #b >= 2 then
+            --[[
+                                    | b[1] |
+                                    | b[2] |
+                                    | b[3] |
+            
+                | a[1] a[2] a[3] |  |  x   |
+                | a[4] a[5] a[6] |  |  y   |
+                | a[7] a[8] a[9] |  |  z   |
+            ]]
+
+            if #b == 2 then b = {b[1], b[2], 1} end
+            
+            local x = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
+            local y = a[4] * b[1] + a[5] * b[2] + a[6] * b[3]
+            local z = a[7] * b[1] + a[8] * b[2] + a[9] * b[3]
+            return {x, y, z}
+        else
+            error("incorrect second argument length")
+        end
+
+    elseif btype == "number" then
         return
         {
-            v11, v12, v13,
-            v21, v22, v23,
-            v31, v32, v33
+            a[1] * b, a[2] * b, a[3] * b,
+            a[4] * b, a[5] * b, a[6] * b,
+            a[7] * b, a[8] * b, a[9] * b
         }
-    elseif #b >= 3 then
-        --[[
-                                | b[1] |
-                                | b[2] |
-                                | b[3] |
-        
-            | a[1] a[2] a[3] |  |  x   |
-            | a[4] a[5] a[6] |  |  y   |
-            | a[7] a[8] a[9] |  |  z   |
-        ]]
-        
-        local x = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
-        local y = a[4] * b[1] + a[5] * b[2] + a[6] * b[3]
-        local z = a[7] * b[1] + a[8] * b[2] + a[9] * b[3]
-        return {x, y, z}
     else
-        error("incorrect second argument length")
+        error("incorrect second argument type")
     end
 end
 
@@ -98,6 +113,60 @@ function mat3.transpose(mat)
     }
 end
 
+function mat3.det(mat)
+    --[[
+        | mat[1] mat[2] mat[3] |
+        | mat[4] mat[5] mat[6] |
+        | mat[7] mat[8] mat[9] |
+    ]]
+    return
+    (
+        (mat[1] * mat[5] * mat[9]) + (mat[2] * mat[6] * mat[7]) + (mat[3] * mat[4] * mat[8]) -
+        (mat[3] * mat[5] * mat[7]) - (mat[1] * mat[6] * mat[8]) - (mat[2] * mat[4] * mat[9])
+    )
+end
 
+--[[
+    | a b |
+    | c d |
+
+    det = ad - bc
+]]
+
+function mat3.adj(mat)
+    local c11 = mat[5] * mat[9] - mat[6] * mat[8]
+    local c12 = mat[4] * mat[9] - mat[6] * mat[7]
+    local c13 = mat[4] * mat[8] - mat[5] * mat[7]
+
+    local c21 = mat[2] * mat[9] - mat[3] * mat[8]
+    local c22 = mat[1] * mat[9] - mat[3] * mat[7]
+    local c23 = mat[1] * mat[8] - mat[2] * mat[7]
+
+    local c31 = mat[2] * mat[6] - mat[3] * mat[5]
+    local c32 = mat[1] * mat[6] - mat[3] * mat[4]
+    local c33 = mat[1] * mat[5] - mat[2] * mat[4]
+
+    return
+    {
+        c11, -c12, c13,
+        -c21, c22, -c23,
+        c31, -c32, c33
+    }
+end
+
+function mat3.inv(mat)
+    local d = mat3.det(mat)
+    if d == 0 then return nil end
+    return mat3.mul(mat3.transpose(mat3.adj(mat)), 1 / d)
+end
+
+function mat3.idt()
+    return
+    {
+        1, 0, 0,
+        0, 1, 0,
+        0, 0, 1
+    }
+end
 
 return mat3

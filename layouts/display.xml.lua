@@ -56,8 +56,6 @@ function on_open()
 
         events.on(PACK_ID .. ":on_hud_render", on_render)
     end
-
-    print(table.tostring(mat3.mul(mat3.translate({1, -5}), {2, 1, 1})))
 end
 
 function on_render()
