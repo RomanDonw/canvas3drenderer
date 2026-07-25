@@ -107,14 +107,18 @@ function on_render()
 
     local mvpmat = mat4.mul(projmat, mat4.mul(viewmat, modlmat))
 
-    document.canvas.data:clear(0x3F800000) -- hex single-precision floating representation of 1.
+    if F32view ~= nil then
+        document.canvas.data:clear(0x3F800000) -- hex single-precision floating representation of 1.
+    else
+        document.canvas.data:clear(0xFFFFFFFF)
+    end
     local dbuff = document.canvas.data:get_data()
 
     --document.canvas.data:clear(0xFF003040)
     document.canvas.data:clear()
     local cdata = document.canvas.data:get_data()
 
-    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(testtexdata), testtex.width, testtex.height, campos, modlmat, F32view(dbuff), testtexbumpdatau32view, texmat)
+    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(testtexdata), testtex.width, testtex.height, campos, modlmat, dbuff, testtexbumpdatau32view, texmat)
 
     document.canvas.data:set_data(cdata)
 end
@@ -131,9 +135,10 @@ function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, texmat, campo
             local bc = getbarycoords(p1, p2, p3, {i, j})
             if bc ~= nil and bc[1] >= 0 and bc[1] <= 1 and bc[2] >= 0 and bc[2] <= 1 and bc[3] >= 0 and bc[3] <= 1 then
                 local depth = bc[1] * p1[3] + bc[2] * p2[3] + bc[3] * p3[3]
-                local oldrawdepth = dbuff[j * winsz[1] + i + 1]
+                local oldrawdepth = wrapreaddbuff(dbuff, j * winsz[1] + i + 1)--dbuff[j * winsz[1] + i + 1]
                 if oldrawdepth ~= nil and depth < oldrawdepth then
-                    dbuff[j * winsz[1] + i + 1] = depth
+                    --dbuff[j * winsz[1] + i + 1] = depth
+                    wrapwritedbuff(dbuff, j * winsz[1] + i + 1, depth)
 
                     local x = bc[1] * v1[1][1] + bc[2] * v2[1][1] + bc[3] * v3[1][1]
                     local y = bc[1] * v1[1][2] + bc[2] * v2[1][2] + bc[3] * v3[1][2]
@@ -315,4 +320,21 @@ function unpackRGBA(rgba)
         bit.band(bit.rshift(rgba, 16), 0xFF),
         bit.band(bit.rshift(rgba, 24), 0xFF)
     }
+end
+
+function wrapreaddbuff(dbuff, index)
+    if F32view ~= nil then
+        return F32view(dbuff)[index]
+    else
+        return U32view(dbuff)[index] / 0xFFFFFFFF
+    end
+end
+
+function wrapwritedbuff(dbuff, index, value)
+    value = math.clamp(value, 0, 1)
+    if F32view ~= nil then
+        F32view(dbuff)[index] = value
+    else
+        U32view(dbuff)[index] = math.floor(value * 0xFFFFFFFF)
+    end
 end
