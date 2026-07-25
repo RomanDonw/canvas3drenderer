@@ -16,10 +16,10 @@ local texturename = "detalizedwall"
 local bumptexturename = "detalizedwall_bump" -- can be nil.
 
 local shininess = 32
-local ambientlight = {0.2, 0.2, 0.2}
+local ambientlight = {1, 1, 1}
 local lights = {
-    {{3, 3, 3}, 100, {13 / 15, 10 / 15, 2 / 15}},
-    {{3, 3, -3}, 14, {0, 0, 1}}
+    --{{3, 3, 3}, 100, {13 / 15, 10 / 15, 2 / 15}},
+    --{{3, 3, -3}, 14, {0, 0, 1}}
 }
 
 local modelpath = PACK_ID .. ":models/pyramid.json"
@@ -123,6 +123,9 @@ end
 
 -- <bumptex> can be nil.
 function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, texmat, campos, v1, v2, v3, p1, p2, p3)
+    local tang = calctangvec(v1, v2, v3)
+    if tang == nil then return end
+
     local min, max = unpack(get2dtriangleAABB(p1, p2, p3))
 
     min = {math.clamp(min[1], 0, winsz[1] - 1), math.clamp(min[2], 0, winsz[2] - 1)}
@@ -144,29 +147,47 @@ function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, texmat, campo
 
                     local fragpos = {x, y, z}
 
-                    local u = bc[1] * v1[2][1] + bc[2] * v2[2][1] + bc[3] * v3[2][1]
-                    local v = bc[1] * v1[2][2] + bc[2] * v2[2][2] + bc[3] * v3[2][2]
+                    -- ==============================================================
+
+                    local invw = bc[1] * v1[1][4] + bc[2] * v2[1][4] + bc[3] * v3[1][4]
+
+                    local u = (bc[1] * v1[2][1] * invw + bc[2] * v2[2][1] * invw + bc[3] * v3[2][1] * invw) / invw
+                    local v = (bc[1] * v1[2][2] * invw + bc[2] * v2[2][2] * invw + bc[3] * v3[2][2] * invw) / invw
 
                     u, v = unpack(mat3.mul(texmat, {u, v}))
 
                     u = (u - math.floor(u))
                     v = (v - math.floor(v))
 
+                    -- ==============================================================
+
                     local nx = bc[1] * v1[3][1] + bc[2] * v2[3][1] + bc[3] * v3[3][1]
                     local ny = bc[1] * v1[3][2] + bc[2] * v2[3][2] + bc[3] * v3[3][2]
                     local nz = bc[1] * v1[3][3] + bc[2] * v2[3][3] + bc[3] * v3[3][3]
 
-                    local fragnormal = vec3.normalize({nx, ny, nz})
+                    local norm = vec3.normalize({nx, ny, nz})
+                    local fragtangent = vec3.normalize(vec3.sub(tang, vec3.mul(norm, vec3.dot(tang, norm))))
+                    local fragbitangent = vec3.mul(norm, fragtangent)
+                    --local fragTBN = mat3.build(fragtangent, fragbitangent, norm)
+                    local fragTBN =
+                    {
+                        fragtangent[1], fragtangent[2], fragtangent[3],
+                        fragbitangent[1], fragbitangent[2], fragbitangent[3],
+                        norm[1], norm[2], norm[3]
+                    }
 
                     -- ==============================================================
 
+                    local fragnormal = nil
                     if bumptex ~= nil then
                         local brawnorm = unpackRGBA(gettexpixel(bumptex, texw, texh, u * texw, v * texh))
                         local bnorm = vec3.sub(
                             vec3.normalize(vec3.mul(vec3.div({brawnorm[1], brawnorm[2], brawnorm[3]}, {255, 255, 255}), {2, 2, 2})),
                             {1, 1, 1}
                         )
-                        vec3.normalize(vec3.add(fragnormal, bnorm), fragnormal)
+                        fragnormal = vec3.normalize(mat3.mul(fragTBN, bnorm))
+                    else
+                        fragnormal = norm
                     end
 
                     -- ==============================================================
@@ -266,6 +287,25 @@ function get2dtriangleAABB(a, b, c)
         {math.min(a[1], b[1], c[1]), math.min(a[2], b[2], c[2])},
         {math.max(a[1], b[1], c[1]), math.max(a[2], b[2], c[2])}
     }
+end
+
+function calctangvec(v1, v2, v3)
+    local edge1 = vec3.sub(v1[1], v2[1])
+    local edge2 = vec3.sub(v3[1], v2[1])
+
+    local deltauv1 = vec2.sub(v1[2], v2[2])
+    local deltauv2 = vec2.sub(v3[2], v2[2])
+
+    local f = deltauv1[1] * deltauv2[2] - deltauv2[1] * deltauv1[2]
+    if f == 0 then return nil end
+    f = 1 / f
+
+    return vec3.normalize(
+        {
+            f * (deltauv2[2] * edge1[1] - deltauv1[2] * edge2[1]),
+            f * (deltauv2[2] * edge1[2] - deltauv1[2] * edge2[2]),
+            f * (deltauv2[2] * edge1[3] - deltauv1[2] * edge2[3])
+        })
 end
 
 function gettexpixel(tex, texw, texh, px, py)
