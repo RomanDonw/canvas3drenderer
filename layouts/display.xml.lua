@@ -35,8 +35,6 @@ local testtexbumpdatau32view = nil
 
 local model = nil
 
-local scl = 1
-
 function on_open()
     testtex = assets.to_canvas(texturename)
 
@@ -241,10 +239,12 @@ function project(point, mvpmat, winsz)
    local clipvec = mat4.mul(mvpmat, point)
    if clipvec[4] <= 0 then return nil end
 
-   return {
+   return
+   {
        (1 + clipvec[1] / clipvec[4]) * 0.5 * winsz[1],
        (1 - clipvec[2] / clipvec[4]) * 0.5 * winsz[2],
-       (1 + clipvec[3] / clipvec[4]) * 0.5
+       (1 + clipvec[3] / clipvec[4]) * 0.5,
+       1 / clipvec[4]
    }
 end
 
@@ -252,7 +252,8 @@ function getbarycoords(a, b, c, p)
     local doublearea = math.abs((b[1] - a[1]) * (c[2] - a[2]) - (c[1] - a[1]) * (b[2] - a[2]))
     if doublearea == 0 then return nil end
 
-    return {
+    return
+    {
         ((b[1] - p[1]) * (c[2] - p[2]) - (c[1] - p[1]) * (b[2] - p[2])) / doublearea,
         ((c[1] - p[1]) * (a[2] - p[2]) - (a[1] - p[1]) * (c[2] - p[2])) / doublearea,
         ((a[1] - p[1]) * (b[2] - p[2]) - (b[1] - p[1]) * (a[2] - p[2])) / doublearea
@@ -260,7 +261,8 @@ function getbarycoords(a, b, c, p)
 end
 
 function get2dtriangleAABB(a, b, c)
-    return {
+    return
+    {
         {math.min(a[1], b[1], c[1]), math.min(a[2], b[2], c[2])},
         {math.max(a[1], b[1], c[1]), math.max(a[2], b[2], c[2])}
     }
@@ -314,7 +316,8 @@ function packRGBA(r, g, b, a)
 end
 
 function unpackRGBA(rgba)
-    return {
+    return
+    {
         bit.band(rgba, 0xFF),
         bit.band(bit.rshift(rgba, 8), 0xFF),
         bit.band(bit.rshift(rgba, 16), 0xFF),
