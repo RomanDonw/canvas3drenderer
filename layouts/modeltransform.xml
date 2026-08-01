@@ -1,4 +1,10 @@
 <panel size="400,400" color="#00000080" scrollable="true" max-length="400">
+    <label autoresize="true" text-align="center">================ Models ================</label>
+    <label id="currentmodel" autoresize="true" text-align="center"></label>
+    <panel id="modellist" color="0" interval="1" max-length="400"></panel>
+    <button id="refreshmodels" size="0,30" onclick="refresh_models()">Refresh models</button>
+    <label autoresize="true" text-align="center">==================================================</label>
+
     <label autoresize="true" text-align="center">Model X offset:</label>
     <textbox id="slidemdlx" validator="validnum" consumer="function(v) globvars.model.x = tonumber(v) end"></textbox>
 

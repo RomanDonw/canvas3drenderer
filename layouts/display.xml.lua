@@ -8,6 +8,7 @@
 
 require "globvars"
 local mat3 = require "mat3"
+local obj = require "obj"
 
 local near = 0.05
 local far = 1000
@@ -33,7 +34,26 @@ local testtexbump = nil
 local testtexbumpdata = nil
 local testtexbumpdatau32view = nil
 
-local model = nil
+function load_model()
+    local path = globvars.model.path
+    if path ~= nil and file.exists(path) then
+        local mesh = obj.load(path, globvars.model.autofit)
+        if mesh ~= nil then
+            globvars.model.tex = obj.load_texture(path, mesh)
+            return mesh
+        end
+    end
+
+    if file.exists(modelpath) then
+        local mesh = json.parse(file.read(modelpath))
+        if mesh ~= nil then
+            mesh.cullsign = obj.cull_sign(mesh)
+        end
+        globvars.model.tex = nil
+        return mesh
+    end
+    return nil
+end
 
 function on_open()
     testtex = assets.to_canvas(texturename)
@@ -51,9 +71,7 @@ function on_open()
             end
         end
 
-        if file.exists(modelpath) then
-            model = json.parse(file.read(modelpath))
-        end
+        globvars.model.mesh = load_model()
 
         events.on(PACK_ID .. ":on_hud_render", on_render)
 
@@ -82,7 +100,15 @@ function on_render()
     document.canvas.wpos = {0, 0}
     document.canvas.size = winsz
 
+    local model = globvars.model.mesh
     if model == nil then return end
+
+    local modeltex = globvars.model.tex
+    local texdata = modeltex ~= nil and modeltex.data or testtexdata
+    local texw = modeltex ~= nil and modeltex.w or testtex.width
+    local texh = modeltex ~= nil and modeltex.h or testtex.height
+    local bumptex = testtexbumpdatau32view
+    if modeltex ~= nil then bumptex = nil end
 
     local cam = cameras.get(player.get_camera(hud.get_player()))
     local campos = cam:get_pos()
@@ -100,8 +126,8 @@ function on_render()
 
     local texmat = mat3.translate({globvars.texture.x + 0.5, globvars.texture.y + 0.5})
     texmat = mat3.mul(texmat, mat3.rotate(globvars.texture.rot))
-    texmat = mat3.mul(texmat, mat3.translate({-0.5, -0.5}))
     texmat = mat3.mul(texmat, mat3.scale({globvars.texture.sx, globvars.texture.sy}))
+    texmat = mat3.mul(texmat, mat3.translate({-0.5, -0.5}))
 
     local mvpmat = mat4.mul(projmat, mat4.mul(viewmat, modlmat))
 
@@ -116,7 +142,7 @@ function on_render()
     document.canvas.data:clear()
     local cdata = document.canvas.data:get_data()
 
-    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(testtexdata), testtex.width, testtex.height, campos, modlmat, dbuff, testtexbumpdatau32view, texmat)
+    rendermesh(model, mvpmat, U32view(cdata), winsz, U32view(texdata), texw, texh, campos, modlmat, dbuff, bumptex, texmat)
 
     document.canvas.data:set_data(cdata)
 end
@@ -132,17 +158,17 @@ function rendertriangle(c, dbuff, winsz, tex, bumptex, texw, texh, texmat, campo
         for i = math.floor(min[1]), math.ceil(max[1]) do
             local bc = getbarycoords(p1, p2, p3, {i, j})
             if bc ~= nil and bc[1] >= 0 and bc[1] <= 1 and bc[2] >= 0 and bc[2] <= 1 and bc[3] >= 0 and bc[3] <= 1 then
-                local depth = bc[1] * p1[3] + bc[2] * p2[3] + bc[3] * p3[3]
+                local x = bc[1] * v1[1][1] + bc[2] * v2[1][1] + bc[3] * v3[1][1]
+                local y = bc[1] * v1[1][2] + bc[2] * v2[1][2] + bc[3] * v3[1][2]
+                local z = bc[1] * v1[1][3] + bc[2] * v2[1][3] + bc[3] * v3[1][3]
+
+                local fragpos = {x, y, z}
+
+                local depth = vec3.distance(fragpos, campos) / far
                 local oldrawdepth = wrapreaddbuff(dbuff, j * winsz[1] + i + 1)--dbuff[j * winsz[1] + i + 1]
                 if oldrawdepth ~= nil and depth < oldrawdepth then
                     --dbuff[j * winsz[1] + i + 1] = depth
                     wrapwritedbuff(dbuff, j * winsz[1] + i + 1, depth)
-
-                    local x = bc[1] * v1[1][1] + bc[2] * v2[1][1] + bc[3] * v3[1][1]
-                    local y = bc[1] * v1[1][2] + bc[2] * v2[1][2] + bc[3] * v3[1][2]
-                    local z = bc[1] * v1[1][3] + bc[2] * v2[1][3] + bc[3] * v3[1][3]
-
-                    local fragpos = {x, y, z}
 
                     local u = bc[1] * v1[2][1] + bc[2] * v2[2][1] + bc[3] * v3[2][1]
                     local v = bc[1] * v1[2][2] + bc[2] * v2[2][2] + bc[3] * v3[2][2]
@@ -223,6 +249,8 @@ function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelm
         })
     end
 
+    local cullsign = mesh.cullsign or 1
+
     for i = 1, #mesh.triangles do
         local tri = mesh.triangles[i]
 
@@ -230,7 +258,31 @@ function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelm
             tri[2] > 0 or tri[2] <= #mesh.vertices or
             tri[3] > 0 or tri[3] <= #mesh.vertices
         then
-            rendertriangle(canvas, dbuff, winsz, tex, bumptex, texw, texh, texmat, campos, verts[tri[1]], verts[tri[2]], verts[tri[3]], points[tri[1]], points[tri[2]], points[tri[3]])
+            local culled = false
+            if globvars.model.cull then
+                local a = verts[tri[1]][1]
+                local b = verts[tri[2]][1]
+                local c = verts[tri[3]][1]
+
+                local abx, aby, abz = b[1] - a[1], b[2] - a[2], b[3] - a[3]
+                local acx, acy, acz = c[1] - a[1], c[2] - a[2], c[3] - a[3]
+
+                local nx = aby * acz - abz * acy
+                local ny = abz * acx - abx * acz
+                local nz = abx * acy - aby * acx
+
+                local fx = (a[1] + b[1] + c[1]) / 3 - campos[1]
+                local fy = (a[2] + b[2] + c[2]) / 3 - campos[2]
+                local fz = (a[3] + b[3] + c[3]) / 3 - campos[3]
+
+                if cullsign * (nx * fx + ny * fy + nz * fz) >= 0 then
+                    culled = true
+                end
+            end
+
+            if not culled then
+                rendertriangle(canvas, dbuff, winsz, tex, bumptex, texw, texh, texmat, campos, verts[tri[1]], verts[tri[2]], verts[tri[3]], points[tri[1]], points[tri[2]], points[tri[3]])
+            end
         end
     end
 end
@@ -249,7 +301,7 @@ function project(point, mvpmat, winsz)
 end
 
 function getbarycoords(a, b, c, p)
-    local doublearea = math.abs((b[1] - a[1]) * (c[2] - a[2]) - (c[1] - a[1]) * (b[2] - a[2]))
+    local doublearea = (b[1] - a[1]) * (c[2] - a[2]) - (c[1] - a[1]) * (b[2] - a[2])
     if doublearea == 0 then return nil end
 
     return

@@ -1,0 +1,1 @@
+<button size='0,30' onclick='select_model("%{path}")'>%{name}</button>

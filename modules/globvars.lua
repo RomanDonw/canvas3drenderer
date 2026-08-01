@@ -19,6 +19,13 @@ globvars =
         sx = 1,
         sy = 1,
         sz = 1,
+
+        name = "pyramid",
+        path = nil,
+        mesh = nil,
+        tex = nil,
+        autofit = true,
+        cull = true,
     },
     texture =
     {
