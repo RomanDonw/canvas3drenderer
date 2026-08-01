@@ -5,8 +5,12 @@
 ]]
 
 require "globvars"
+local obj = require "obj"
 
 function on_open()
+    document.currentmodel.text = "Model: " .. globvars.model.name
+    refresh_models()
+
     document.slidemdlx.text = "" .. globvars.model.x
     document.slidemdly.text = "" .. globvars.model.y
     document.slidemdlz.text = "" .. globvars.model.z
@@ -28,6 +32,68 @@ function on_open()
 
     document.slidetexsx.text = "" .. globvars.texture.sx
     document.slidetexsy.text = "" .. globvars.texture.sy
+end
+
+function luaesc(str)
+    return str:gsub("\\", "\\\\"):gsub('"', '\\"')
+end
+
+function xmlesc(str)
+    return str:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
+end
+
+function modelname(path)
+    local name = file.name(path)
+    name = name:match("^(.*)%.[^%.]+$") or name
+    return name
+end
+
+function isobj(path)
+    local name = file.name(path)
+    return name:lower():sub(-4) == ".obj"
+end
+
+function refresh_models()
+    local list = document.modellist
+    list:clear()
+
+    local items = {}
+    local ok, entries = pcall(file.list, "export:")
+    if not ok or entries == nil or #entries == 0 then
+        ok, entries = pcall(file.list, "export:/")
+    end
+    if ok and entries ~= nil then
+        for _, p in ipairs(entries) do
+            p = p:gsub(":/+", ":")
+            if file.isfile(p) and isobj(p) then
+                table.insert(items, p)
+            end
+        end
+    end
+
+    table.sort(items)
+
+    for _, p in ipairs(items) do
+        list:add(gui.template("model_item", {
+            path = luaesc(p),
+            name = xmlesc(modelname(p))
+        }))
+    end
+end
+
+function select_model(path)
+    local mesh = obj.load(path, globvars.model.autofit)
+    if mesh == nil then
+        console.chat("failed to load model: " .. path)
+        return
+    end
+
+    globvars.model.path = path
+    globvars.model.name = modelname(path)
+    globvars.model.mesh = mesh
+    globvars.model.tex = obj.load_texture(path, mesh)
+
+    document.currentmodel.text = "Model: " .. globvars.model.name
 end
 
 function round(num, digits)
