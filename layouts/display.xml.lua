@@ -131,7 +131,7 @@ function on_render()
 
     local mvpmat = mat4.mul(projmat, mat4.mul(viewmat, modlmat))
 
-    if F32view ~= nil then
+    if FLTview ~= nil then
         document.canvas.data:clear(0x3F800000) -- hex single-precision floating representation of 1.
     else
         document.canvas.data:clear(0xFFFFFFFF)
@@ -240,7 +240,7 @@ function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelm
     for i = 1, #mesh.vertices do
         local point = project(mesh.vertices[i][1], mvpmat, winsz)
         if point == nil then return end
-        table.insert(points, point)
+        table.insert(points, {point, {point[1] * winsz[1], point[2] * winsz[2]}})
 
         table.insert(verts, {
             mat4.mul(modelmat, mesh.vertices[i][1]),
@@ -281,20 +281,30 @@ function rendermesh(mesh, mvpmat, canvas, winsz, tex, texw, texh, campos, modelm
             end
 
             if not culled then
-                rendertriangle(canvas, dbuff, winsz, tex, bumptex, texw, texh, texmat, campos, verts[tri[1]], verts[tri[2]], verts[tri[3]], points[tri[1]], points[tri[2]], points[tri[3]])
+                local p1 = points[tri[1]]
+                local p2 = points[tri[2]]
+                local p3 = points[tri[3]]
+
+                if
+                    (p1[1])[1] >= 0 and (p1[1])[1] < 1 and (p1[1])[2] >= 0 and (p1[1])[2] < 1 or
+                    (p2[1])[1] >= 0 and (p2[1])[1] < 1 and (p2[1])[2] >= 0 and (p2[1])[2] < 1 or
+                    (p3[1])[1] >= 0 and (p3[1])[1] < 1 and (p3[1])[2] >= 0 and (p3[1])[2] < 1
+                then
+                    rendertriangle(canvas, dbuff, winsz, tex, bumptex, texw, texh, texmat, campos, verts[tri[1]], verts[tri[2]], verts[tri[3]], p1[2], p2[2], p3[2])
+                end
             end
         end
     end
 end
 
-function project(point, mvpmat, winsz)
+function project(point, mvpmat)
    local clipvec = mat4.mul(mvpmat, point)
    if clipvec[4] <= 0 then return nil end
 
    return
    {
-       (1 + clipvec[1] / clipvec[4]) * 0.5 * winsz[1],
-       (1 - clipvec[2] / clipvec[4]) * 0.5 * winsz[2],
+       (1 + clipvec[1] / clipvec[4]) * 0.5,
+       (1 - clipvec[2] / clipvec[4]) * 0.5,
        (1 + clipvec[3] / clipvec[4]) * 0.5,
        1 / clipvec[4]
    }
@@ -378,8 +388,8 @@ function unpackRGBA(rgba)
 end
 
 function wrapreaddbuff(dbuff, index)
-    if F32view ~= nil then
-        return F32view(dbuff)[index]
+    if FLTview ~= nil then
+        return FLTview(dbuff)[index]
     else
         return U32view(dbuff)[index] / 0xFFFFFFFF
     end
@@ -387,8 +397,8 @@ end
 
 function wrapwritedbuff(dbuff, index, value)
     value = math.clamp(value, 0, 1)
-    if F32view ~= nil then
-        F32view(dbuff)[index] = value
+    if FLTview ~= nil then
+        FLTview(dbuff)[index] = value
     else
         U32view(dbuff)[index] = math.floor(value * 0xFFFFFFFF)
     end
